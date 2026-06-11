@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Lista {
+  id        Int       @id @default(autoincrement())
+  nome      String
+  createdAt DateTime  @default(now())
+  contatos  Contato[]
+
+  @@map("listas")
+}
+
+model Contato {
+  id        Int      @id @default(autoincrement())
+  listaId   Int
+  nome      String
+  telefone  String
+  createdAt DateTime @default(now())
+
+  lista          Lista           @relation(fields: [listaId], references: [id])
+  filaEnvios     FilaEnvio[]
+  execucoesFluxo ExecucaoFluxo[]
+
+  @@map("contatos")
+}
+
+model Campanha {
+  id        Int      @id @default(autoincrement())
+  nome      String
+  mensagem  String
+  delayMin  Int
+  delayMax  Int
+  listaId   Int
+  status    String   @default("pendente")
+  createdAt DateTime @default(now())
+
+  filaEnvios FilaEnvio[]
+
+  @@map("campanhas")
+}
+
+model FilaEnvio {
+  id          Int       @id @default(autoincrement())
+  contatoId   Int
+  campanhaId  Int
+  mensagem    String
+  status      String    @default("pendente")
+  scheduledAt DateTime
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  contato  Contato  @relation(fields: [contatoId], references: [id])
+  campanha Campanha @relation(fields: [campanhaId], references: [id])
+
+  @@map("fila_envio")
+}
+
+model Fluxo {
+  id        Int           @id @default(autoincrement())
+  nome      String
+  createdAt DateTime      @default(now())
+  etapas    FluxoEtapa[]
+  execucoes ExecucaoFluxo[]
+
+  @@map("fluxos")
+}
+
+model FluxoEtapa {
+  id             Int    @id @default(autoincrement())
+  fluxoId        Int
+  ordem          Int
+  mensagem       String
+  delayMinutos   Int
+
+  fluxo Fluxo @relation(fields: [fluxoId], references: [id])
+
+  @@map("fluxo_etapas")
+}
+
+model ExecucaoFluxo {
+  id                Int       @id @default(autoincrement())
+  contatoId         Int
+  fluxoId           Int
+  etapaAtual        Int       @default(0)
+  nextExecutionAt   DateTime
+  status            String    @default("ativo")
+  createdAt         DateTime  @default(now())
+
+  contato Contato @relation(fields: [contatoId], references: [id])
+  fluxo   Fluxo   @relation(fields: [fluxoId], references: [id])
+
+  @@map("execucao_fluxo")
+}
