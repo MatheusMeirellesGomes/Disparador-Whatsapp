@@ -50,17 +50,42 @@ export default function Campanhas() {
         delayMax: Number(form.delayMax),
         listaId: Number(form.listaId),
       })
-      setMsg({ tipo: 'success', texto: 'Campanha criada e mensagens agendadas!' })
+      setMsg({ tipo: 'success', texto: '✅ Campanha criada e mensagens agendadas!' })
       setForm({ nome: '', mensagem: '', delayMin: 5, delayMax: 15, listaId: '' })
       carregarDados()
     } catch (err: unknown) {
-      setMsg({ tipo: 'error', texto: err instanceof Error ? err.message : 'Erro ao criar campanha' })
+      setMsg({ tipo: 'error', texto: '❌ ' + (err instanceof Error ? err.message : 'Erro ao criar campanha') })
     }
   }
 
+  const total = campanhas.length
+  const agendadas = campanhas.filter(c => c.status === 'agendada').length
+  const pendentes = campanhas.filter(c => c.status === 'pendente').length
+
   return (
     <div>
-      <h1 className="page-title">Campanhas</h1>
+      <div className="page-header">
+        <h1 className="page-title">Campanhas</h1>
+        <p className="page-subtitle">Envie mensagens em massa com delay aleatório entre cada disparo</p>
+      </div>
+
+      <div className="stats-row">
+        <div className="stat-card">
+          <div className="stat-icon">📣</div>
+          <div className="stat-label">Total de Campanhas</div>
+          <div className="stat-value">{total}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon">🕐</div>
+          <div className="stat-label">Agendadas</div>
+          <div className="stat-value">{agendadas}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon">⏳</div>
+          <div className="stat-label">Pendentes</div>
+          <div className="stat-value">{pendentes}</div>
+        </div>
+      </div>
 
       {msg && (
         <div className={`alert alert-${msg.tipo}`} onClick={() => setMsg(null)}>
@@ -69,17 +94,34 @@ export default function Campanhas() {
       )}
 
       <div className="card">
-        <h2>Nova Campanha</h2>
+        <div className="card-header">
+          <h2>Nova Campanha</h2>
+        </div>
         <form onSubmit={criarCampanha}>
-          <div className="form-group">
-            <label>Nome da campanha</label>
-            <input
-              type="text"
-              value={form.nome}
-              onChange={e => setForm({ ...form, nome: e.target.value })}
-              placeholder="Ex: Promoção Junho"
-              required
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label>Nome da campanha</label>
+              <input
+                type="text"
+                value={form.nome}
+                onChange={e => setForm({ ...form, nome: e.target.value })}
+                placeholder="Ex: Promoção Junho"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Lista de contatos</label>
+              <select
+                value={form.listaId}
+                onChange={e => setForm({ ...form, listaId: e.target.value })}
+                required
+              >
+                <option value="">-- selecione --</option>
+                {listas.map(l => (
+                  <option key={l.id} value={l.id}>{l.nome}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="form-group">
             <label>Mensagem</label>
@@ -87,7 +129,7 @@ export default function Campanhas() {
               rows={4}
               value={form.mensagem}
               onChange={e => setForm({ ...form, mensagem: e.target.value })}
-              placeholder="Olá {nome}, temos uma oferta especial para você!"
+              placeholder="Olá! Temos uma oferta especial para você..."
               required
             />
           </div>
@@ -113,52 +155,46 @@ export default function Campanhas() {
               />
             </div>
           </div>
-          <div className="form-group">
-            <label>Lista de contatos</label>
-            <select
-              value={form.listaId}
-              onChange={e => setForm({ ...form, listaId: e.target.value })}
-              required
-            >
-              <option value="">-- selecione --</option>
-              {listas.map(l => (
-                <option key={l.id} value={l.id}>{l.nome}</option>
-              ))}
-            </select>
+          <div className="form-actions">
+            <button type="submit" className="btn btn-primary">🚀 Criar e Agendar</button>
           </div>
-          <button type="submit" className="btn btn-primary">Criar e Agendar</button>
         </form>
       </div>
 
       <div className="card">
-        <h2>Campanhas</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Mensagem</th>
-              <th>Delay</th>
-              <th>Status</th>
-              <th>Criada em</th>
-            </tr>
-          </thead>
-          <tbody>
-            {campanhas.map(c => (
-              <tr key={c.id}>
-                <td>{c.nome}</td>
-                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {c.mensagem}
-                </td>
-                <td>{c.delayMin}s – {c.delayMax}s</td>
-                <td><span className={`badge badge-${c.status}`}>{c.status}</span></td>
-                <td>{new Date(c.createdAt).toLocaleString('pt-BR')}</td>
+        <div className="card-header">
+          <h2>Campanhas criadas</h2>
+          <span style={{ fontSize: 13, color: '#64748b' }}>{campanhas.length} campanha(s)</span>
+        </div>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Mensagem</th>
+                <th>Delay</th>
+                <th>Status</th>
+                <th>Criada em</th>
               </tr>
-            ))}
-            {campanhas.length === 0 && (
-              <tr><td colSpan={5} style={{ color: '#999', textAlign: 'center' }}>Nenhuma campanha criada</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {campanhas.map(c => (
+                <tr key={c.id}>
+                  <td><strong>{c.nome}</strong></td>
+                  <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#64748b' }}>
+                    {c.mensagem}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{c.delayMin}s – {c.delayMax}s</td>
+                  <td><span className={`badge badge-${c.status}`}>{c.status}</span></td>
+                  <td style={{ color: '#64748b', fontSize: 13 }}>{new Date(c.createdAt).toLocaleString('pt-BR')}</td>
+                </tr>
+              ))}
+              {campanhas.length === 0 && (
+                <tr className="empty-row"><td colSpan={5}>Nenhuma campanha criada ainda</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

@@ -7,6 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  senha     String
+  createdAt DateTime @default(now())
+
+  @@map("usuarios")
+}
+
 model Lista {
   id        Int       @id @default(autoincrement())
   nome      String
