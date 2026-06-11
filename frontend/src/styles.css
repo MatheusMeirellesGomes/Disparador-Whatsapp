@@ -1,0 +1,225 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f0f2f5;
+  color: #333;
+}
+
+/* Layout */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  background-color: #128C7E;
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar h1 {
+  color: #fff;
+  font-size: 16px;
+  padding: 0 20px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  margin-bottom: 12px;
+}
+
+.sidebar a {
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  padding: 12px 20px;
+  font-size: 15px;
+  transition: background 0.2s;
+}
+
+.sidebar a:hover,
+.sidebar a.active {
+  background-color: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+.content {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+/* Cards */
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.card h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: #128C7E;
+}
+
+/* Formulários */
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #555;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  transition: border 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border-color: #128C7E;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+/* Botões */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn:hover {
+  opacity: 0.85;
+}
+
+.btn-primary {
+  background-color: #128C7E;
+  color: #fff;
+}
+
+.btn-secondary {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.btn-danger {
+  background-color: #e53935;
+  color: #fff;
+}
+
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+/* Tabelas */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th {
+  text-align: left;
+  padding: 10px 12px;
+  background-color: #f5f5f5;
+  border-bottom: 2px solid #e0e0e0;
+  color: #555;
+  font-size: 13px;
+}
+
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+tr:hover td {
+  background-color: #fafafa;
+}
+
+/* Badge de status */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-pendente  { background: #fff3cd; color: #856404; }
+.badge-agendada  { background: #cce5ff; color: #004085; }
+.badge-enviado   { background: #d4edda; color: #155724; }
+.badge-ativo     { background: #cce5ff; color: #004085; }
+.badge-concluido { background: #d4edda; color: #155724; }
+.badge-erro      { background: #f8d7da; color: #721c24; }
+
+/* Mensagens de feedback */
+.alert {
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.alert-success { background: #d4edda; color: #155724; }
+.alert-error   { background: #f8d7da; color: #721c24; }
+
+/* Etapas do fluxo */
+.etapas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.etapa-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 14px;
+  background: #fafafa;
+  position: relative;
+}
+
+.etapa-item .etapa-numero {
+  font-size: 12px;
+  font-weight: 700;
+  color: #128C7E;
+  margin-bottom: 8px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: #222;
+}
