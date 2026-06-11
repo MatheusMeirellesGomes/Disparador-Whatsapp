@@ -1,5 +1,8 @@
 node_modules/
 dist/
 .env
-uploads/
 *.log
+
+# manter a pasta uploads mas ignorar arquivos dentro
+uploads/*
+!uploads/.gitkeep

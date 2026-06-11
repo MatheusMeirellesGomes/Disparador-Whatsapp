@@ -45,11 +45,10 @@ export default function Login({ onLogin }: Props) {
       <div className="login-left">
         <div className="login-left-content">
           <div className="login-brand">
-            <span className="login-brand-icon">📱</span>
-            <h1>Disparador<span>WPP</span></h1>
+            <img src="/devsider-logo.svg" alt="Devsider" className="login-logo" />
           </div>
           <p className="login-tagline">
-            Automatize seus envios de WhatsApp com fluxos inteligentes e campanhas em massa.
+            Plataforma de automação WhatsApp desenvolvida pela Devsider — Systems · Cloud · Labs · AI
           </p>
           <div className="login-features">
             <div className="login-feature">

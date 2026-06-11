@@ -34,19 +34,14 @@ body {
 }
 
 .sidebar-logo {
-  padding: 28px 24px 20px;
+  padding: 20px 20px 16px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-.sidebar-logo h1 {
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-}
-
-.sidebar-logo span {
-  color: #22d3ee;
+.sidebar-logo-img {
+  width: 160px;
+  height: auto;
+  display: block;
 }
 
 .sidebar-subtitle {
@@ -481,19 +476,10 @@ tbody tr:hover td {
   margin-bottom: 32px;
 }
 
-.login-brand-icon {
-  font-size: 40px;
-}
-
-.login-brand h1 {
-  font-size: 32px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: -1px;
-}
-
-.login-brand h1 span {
-  color: #22d3ee;
+.login-logo {
+  width: 280px;
+  height: auto;
+  filter: drop-shadow(0 4px 24px rgba(34,211,238,0.15));
 }
 
 .login-tagline {

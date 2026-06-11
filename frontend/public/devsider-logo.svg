@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 100">
+  <!-- DS icon circle -->
+  <circle cx="46" cy="50" r="38" fill="none" stroke="#c9a84c" stroke-width="2.5"/>
+  <circle cx="46" cy="50" r="30" fill="none" stroke="#c9a84c" stroke-width="1"/>
+  <text x="46" y="57" text-anchor="middle" font-family="Arial Black, sans-serif" font-size="22" font-weight="900" fill="url(#grad)">DS</text>
+
+  <!-- DEVSIDER text -->
+  <text x="102" y="48" font-family="Arial Black, sans-serif" font-size="28" font-weight="900" letter-spacing="3" fill="#ffffff">DEVSIDER</text>
+
+  <!-- Subtitle — espaço suficiente para não cortar -->
+  <text x="102" y="70" font-family="Arial, sans-serif" font-size="10.5" letter-spacing="2.5" fill="#8ab4c9">SYSTEMS · CLOUD · LABS · AI</text>
+
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0d080;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c9a84c;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>

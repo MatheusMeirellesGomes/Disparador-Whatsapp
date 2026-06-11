@@ -26,7 +26,7 @@ export default function App() {
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <h1>📱 Dispar<span>ador</span></h1>
+          <img src="/devsider-logo.svg" alt="Devsider" className="sidebar-logo-img" />
           <p className="sidebar-user">👤 {email}</p>
         </div>
         <p className="sidebar-subtitle">Menu</p>
