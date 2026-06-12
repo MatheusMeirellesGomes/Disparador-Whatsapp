@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { get, post } from '../services/api'
+import { get, post, del } from '../services/api'
 
 interface Lista {
   id: number
@@ -98,6 +98,13 @@ export default function Fluxos() {
     } catch (err: unknown) {
       setMsg({ tipo: 'error', texto: '❌ ' + (err instanceof Error ? err.message : 'Erro ao iniciar fluxo') })
     }
+  }
+
+  async function removerFluxo(id: number) {
+    if (!confirm('Remover este fluxo e todas as execuções?')) return
+    await del(`/fluxos/${id}`)
+    setFluxos(prev => prev.filter(f => f.id !== id))
+    if (fluxoSelecionado === id) setExecucoes([])
   }
 
   async function verExecucoes(fluxoId: number) {
@@ -266,12 +273,18 @@ export default function Fluxos() {
                   <tr key={f.id}>
                     <td><strong>{f.nome}</strong></td>
                     <td>{f.etapas.length} etapa(s)</td>
-                    <td>
+                    <td style={{ display: 'flex', gap: 8 }}>
                       <button
                         className="btn btn-secondary btn-sm"
                         onClick={() => verExecucoes(f.id)}
                       >
-                        👁 Ver execuções
+                        👁 Ver
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => removerFluxo(f.id)}
+                      >
+                        🗑
                       </button>
                     </td>
                   </tr>

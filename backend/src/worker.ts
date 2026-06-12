@@ -1,50 +1,70 @@
 import { PrismaClient } from '@prisma/client'
 import dotenv from 'dotenv'
-import { enviarMensagem, iniciarSessao, verificarFlagInicio } from './services/whatsapp'
 
 dotenv.config()
 
 const prisma = new PrismaClient()
 const INTERVALO_MS = 5000
-const MOCK_MODE = process.env.WHATSAPP_MOCK !== 'false'
+const API_URL = `http://localhost:${process.env.PORT || 3000}`
+
+async function isWhatsAppConnected(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/whatsapp/status`, { signal: AbortSignal.timeout(5000) })
+    const data = await res.json() as { status: string }
+    return data.status === 'conectado'
+  } catch {
+    return false
+  }
+}
+
+async function enviarMensagem(telefone: string, mensagem: string): Promise<void> {
+  const res = await fetch(`${API_URL}/whatsapp/enviar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ telefone, mensagem }),
+    signal: AbortSignal.timeout(60000),
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Falha ao enviar: ${body}`)
+  }
+}
 
 async function processarFilaCampanha() {
+  const conectado = await isWhatsAppConnected()
+  if (!conectado) {
+    console.log('[WORKER] WhatsApp não conectado — aguardando...')
+    return
+  }
+
   const pendentes = await prisma.filaEnvio.findMany({
-    where: {
-      status: 'pendente',
-      scheduledAt: { lte: new Date() },
-    },
+    where: { status: 'pendente', scheduledAt: { lte: new Date() } },
     include: { contato: true },
-    take: 10,
+    take: 5,
   })
 
   for (const item of pendentes) {
     try {
       await prisma.filaEnvio.update({ where: { id: item.id }, data: { status: 'processando' } })
       await enviarMensagem(item.contato.telefone, item.mensagem)
-      await prisma.filaEnvio.update({
-        where: { id: item.id },
-        data: { status: 'enviado', sentAt: new Date() },
-      })
-      console.log(`[CAMPANHA] ✅ Enviado para ${item.contato.telefone}`)
+      await prisma.filaEnvio.update({ where: { id: item.id }, data: { status: 'enviado', sentAt: new Date() } })
+      console.log(`[CAMPANHA] ✅ Enviado → ${item.contato.telefone}`)
+      await new Promise(r => setTimeout(r, 2000))
     } catch (err) {
       await prisma.filaEnvio.update({ where: { id: item.id }, data: { status: 'erro' } })
-      console.error(`[CAMPANHA] ❌ Erro ao enviar para ${item.contato.telefone}:`, err)
+      console.error(`[CAMPANHA] ❌ Erro → ${item.contato.telefone}:`, err)
     }
   }
 }
 
 async function processarFluxos() {
+  const conectado = await isWhatsAppConnected()
+  if (!conectado) return
+
   const execucoes = await prisma.execucaoFluxo.findMany({
-    where: {
-      status: 'ativo',
-      nextExecutionAt: { lte: new Date() },
-    },
-    include: {
-      contato: true,
-      fluxo: { include: { etapas: { orderBy: { ordem: 'asc' } } } },
-    },
-    take: 10,
+    where: { status: 'ativo', nextExecutionAt: { lte: new Date() } },
+    include: { contato: true, fluxo: { include: { etapas: { orderBy: { ordem: 'asc' } } } } },
+    take: 5,
   })
 
   for (const execucao of execucoes) {
@@ -60,50 +80,38 @@ async function processarFluxos() {
 
     try {
       await enviarMensagem(execucao.contato.telefone, etapa.mensagem)
-      console.log(`[FLUXO] ✅ Etapa ${etapaIndex + 1} enviada para ${execucao.contato.telefone}`)
+      console.log(`[FLUXO] ✅ Etapa ${etapaIndex + 1} → ${execucao.contato.telefone}`)
 
-      const proximaEtapaIndex = etapaIndex + 1
-      const proximaEtapa = etapas[proximaEtapaIndex]
+      const proximaIndex = etapaIndex + 1
+      const proximaEtapa = etapas[proximaIndex]
 
       if (!proximaEtapa) {
         await prisma.execucaoFluxo.update({ where: { id: execucao.id }, data: { status: 'concluido' } })
-        console.log(`[FLUXO] ✅ Fluxo concluído para ${execucao.contato.telefone}`)
       } else {
         const nextExecutionAt = new Date(Date.now() + proximaEtapa.delayMinutos * 60 * 1000)
-        await prisma.execucaoFluxo.update({
-          where: { id: execucao.id },
-          data: { etapaAtual: proximaEtapaIndex, nextExecutionAt },
-        })
+        await prisma.execucaoFluxo.update({ where: { id: execucao.id }, data: { etapaAtual: proximaIndex, nextExecutionAt } })
       }
+
+      await new Promise(r => setTimeout(r, 2000))
     } catch (err) {
-      console.error(`[FLUXO] ❌ Erro para ${execucao.contato.telefone}:`, err)
+      console.error(`[FLUXO] ❌ Erro → ${execucao.contato.telefone}:`, err)
     }
   }
 }
 
 async function tick() {
   try {
-    // Verifica se a API solicitou início de sessão WhatsApp
-    if (!MOCK_MODE && verificarFlagInicio()) {
-      console.log('[WORKER] Iniciando sessão WhatsApp...')
-      iniciarSessao()
-    }
-
     await processarFilaCampanha()
     await processarFluxos()
   } catch (err) {
-    console.error('[WORKER] Erro no tick:', err)
+    console.error('[WORKER] Erro:', err)
   } finally {
     setTimeout(tick, INTERVALO_MS)
   }
 }
 
-console.log(`[WORKER] Iniciando... Modo: ${MOCK_MODE ? 'MOCK' : 'REAL'}`)
-
-// Se modo real, já inicia a sessão automaticamente
-if (!MOCK_MODE) {
-  console.log('[WORKER] Modo real — iniciando sessão WhatsApp automaticamente...')
-  iniciarSessao()
-}
-
-tick()
+console.log('[WORKER] Iniciando — aguardando 15s para WhatsApp conectar...')
+setTimeout(() => {
+  console.log('[WORKER] Começando a processar fila...')
+  tick()
+}, 15000)

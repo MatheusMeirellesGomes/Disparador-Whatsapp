@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.13.0",
-    "@wppconnect-team/wppconnect": "^2.2.1",
+    "@wppconnect-team/wppconnect": "^1.30.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "csv-parse": "^5.5.6",

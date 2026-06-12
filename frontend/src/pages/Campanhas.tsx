@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { get, post } from '../services/api'
+import { get, post, del } from '../services/api'
 
 interface Lista {
   id: number
@@ -39,6 +39,12 @@ export default function Campanhas() {
     ])
     setCampanhas(c)
     setListas(l)
+  }
+
+  async function removerCampanha(id: number) {
+    if (!confirm('Remover esta campanha e todas as mensagens agendadas?')) return
+    await del(`/campanhas/${id}`)
+    setCampanhas(prev => prev.filter(c => c.id !== id))
   }
 
   async function criarCampanha(e: React.FormEvent) {
@@ -175,6 +181,7 @@ export default function Campanhas() {
                 <th>Delay</th>
                 <th>Status</th>
                 <th>Criada em</th>
+                <th>Ação</th>
               </tr>
             </thead>
             <tbody>
@@ -187,10 +194,13 @@ export default function Campanhas() {
                   <td style={{ whiteSpace: 'nowrap' }}>{c.delayMin}s – {c.delayMax}s</td>
                   <td><span className={`badge badge-${c.status}`}>{c.status}</span></td>
                   <td style={{ color: '#64748b', fontSize: 13 }}>{new Date(c.createdAt).toLocaleString('pt-BR')}</td>
+                  <td>
+                    <button className="btn btn-danger btn-sm" onClick={() => removerCampanha(c.id)}>🗑</button>
+                  </td>
                 </tr>
               ))}
               {campanhas.length === 0 && (
-                <tr className="empty-row"><td colSpan={5}>Nenhuma campanha criada ainda</td></tr>
+                <tr className="empty-row"><td colSpan={6}>Nenhuma campanha criada ainda</td></tr>
               )}
             </tbody>
           </table>

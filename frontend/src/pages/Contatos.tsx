@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { get, post, postForm } from '../services/api'
+import { get, post, postForm, del } from '../services/api'
 
 interface Lista {
   id: number
@@ -19,6 +19,9 @@ export default function Contatos() {
   const [listaSelecionada, setListaSelecionada] = useState<number | null>(null)
   const [contatos, setContatos] = useState<Contato[]>([])
   const [arquivo, setArquivo] = useState<File | null>(null)
+  const [nomeContato, setNomeContato] = useState('')
+  const [telefoneContato, setTelefoneContato] = useState('')
+  const [listaManual, setListaManual] = useState<number | null>(null)
   const [msg, setMsg] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null)
 
   useEffect(() => {
@@ -39,18 +42,58 @@ export default function Contatos() {
     setMsg({ tipo: 'success', texto: '✅ Lista criada com sucesso!' })
   }
 
+  async function adicionarManual(e: React.FormEvent) {
+    e.preventDefault()
+    if (!nomeContato.trim() || !telefoneContato.trim() || !listaManual) return
+    try {
+      await post(`/contatos/listas/${listaManual}/contatos`, {
+        nome: nomeContato,
+        telefone: telefoneContato,
+      })
+      setNomeContato('')
+      setTelefoneContato('')
+      setMsg({ tipo: 'success', texto: '✅ Contato adicionado!' })
+      carregarListas()
+      if (listaSelecionada === listaManual) verContatos(listaManual)
+    } catch {
+      setMsg({ tipo: 'error', texto: '❌ Erro ao adicionar contato' })
+    }
+  }
+
   async function importarCSV(e: React.FormEvent) {
     e.preventDefault()
     if (!arquivo || !listaSelecionada) return
     const form = new FormData()
     form.append('arquivo', arquivo)
-    const res = await postForm<{ importados: number }>(
-      `/contatos/listas/${listaSelecionada}/importar`,
-      form
-    )
-    setMsg({ tipo: 'success', texto: `✅ ${res.importados} contatos importados com sucesso!` })
-    setArquivo(null)
+    try {
+      const res = await postForm<{ importados: number }>(
+        `/contatos/listas/${listaSelecionada}/importar`,
+        form
+      )
+      setMsg({ tipo: 'success', texto: `✅ ${res.importados} contatos importados!` })
+      setArquivo(null)
+      carregarListas()
+      verContatos(listaSelecionada)
+    } catch {
+      setMsg({ tipo: 'error', texto: '❌ Erro ao importar CSV. Verifique o formato do arquivo.' })
+    }
+  }
+
+  async function removerContato(id: number) {
+    if (!confirm('Remover este contato?')) return
+    await del(`/contatos/contatos/${id}`)
+    setContatos(prev => prev.filter(c => c.id !== id))
     carregarListas()
+  }
+
+  async function removerLista(id: number) {
+    if (!confirm('Remover esta lista e todos os seus contatos?')) return
+    await del(`/contatos/listas/${id}`)
+    setListas(prev => prev.filter(l => l.id !== id))
+    if (listaSelecionada === id) {
+      setListaSelecionada(null)
+      setContatos([])
+    }
   }
 
   async function verContatos(listaId: number) {
@@ -115,17 +158,14 @@ export default function Contatos() {
 
         <div className="card">
           <div className="card-header">
-            <h2>Importar CSV</h2>
+            <h2>Adicionar Contato</h2>
           </div>
-          <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
-            O arquivo deve ter colunas: <strong>nome, telefone</strong>
-          </p>
-          <form onSubmit={importarCSV}>
+          <form onSubmit={adicionarManual}>
             <div className="form-group">
-              <label>Selecionar lista</label>
+              <label>Lista</label>
               <select
-                value={listaSelecionada ?? ''}
-                onChange={e => setListaSelecionada(Number(e.target.value))}
+                value={listaManual ?? ''}
+                onChange={e => setListaManual(Number(e.target.value))}
               >
                 <option value="">-- selecione --</option>
                 {listas.map(l => (
@@ -134,18 +174,60 @@ export default function Contatos() {
               </select>
             </div>
             <div className="form-group">
-              <label>Arquivo CSV</label>
+              <label>Nome</label>
               <input
-                type="file"
-                accept=".csv"
-                onChange={e => setArquivo(e.target.files?.[0] ?? null)}
+                type="text"
+                value={nomeContato}
+                onChange={e => setNomeContato(e.target.value)}
+                placeholder="Ex: João Silva"
+              />
+            </div>
+            <div className="form-group">
+              <label>Telefone (com DDI e DDD)</label>
+              <input
+                type="text"
+                value={telefoneContato}
+                onChange={e => setTelefoneContato(e.target.value)}
+                placeholder="Ex: 5531999999999"
               />
             </div>
             <div className="form-actions">
-              <button type="submit" className="btn btn-primary">📤 Importar</button>
+              <button type="submit" className="btn btn-primary">➕ Adicionar</button>
             </div>
           </form>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2>Importar CSV</h2>
+        </div>
+        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+          O arquivo deve ter colunas: <strong>nome, telefone</strong> — salve como texto simples (.csv ou .txt)
+        </p>
+        <form onSubmit={importarCSV} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 16, alignItems: 'end' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Lista</label>
+            <select
+              value={listaSelecionada ?? ''}
+              onChange={e => setListaSelecionada(Number(e.target.value))}
+            >
+              <option value="">-- selecione --</option>
+              {listas.map(l => (
+                <option key={l.id} value={l.id}>{l.nome}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label>Arquivo</label>
+            <input
+              type="file"
+              onChange={e => setArquivo(e.target.files?.[0] ?? null)}
+            />
+          </div>
+          <div />
+          <button type="submit" className="btn btn-primary">📤 Importar</button>
+        </form>
       </div>
 
       <div className="card">
@@ -167,12 +249,18 @@ export default function Contatos() {
                 <tr key={lista.id}>
                   <td><strong>{lista.nome}</strong></td>
                   <td>{lista._count.contatos} contato(s)</td>
-                  <td>
+                  <td style={{ display: 'flex', gap: 8 }}>
                     <button
                       className="btn btn-secondary btn-sm"
                       onClick={() => verContatos(lista.id)}
                     >
-                      👁 Ver contatos
+                      👁 Ver
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => removerLista(lista.id)}
+                    >
+                      🗑 Remover
                     </button>
                   </td>
                 </tr>
@@ -198,6 +286,7 @@ export default function Contatos() {
                   <th>#</th>
                   <th>Nome</th>
                   <th>Telefone</th>
+                  <th>Ação</th>
                 </tr>
               </thead>
               <tbody>
@@ -206,6 +295,14 @@ export default function Contatos() {
                     <td style={{ color: '#94a3b8', fontSize: 12 }}>{i + 1}</td>
                     <td><strong>{c.nome}</strong></td>
                     <td>{c.telefone}</td>
+                    <td>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => removerContato(c.id)}
+                      >
+                        🗑
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
