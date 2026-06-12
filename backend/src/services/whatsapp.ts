@@ -15,15 +15,18 @@ interface WppState {
   updatedAt: string
 }
 
-// cliente vive apenas no processo do worker
 let client: Awaited<ReturnType<typeof wppconnect.create>> | null = null
 let iniciando = false
 
-// ─── estado compartilhado via arquivo (API lê, Worker escreve) ───────────────
+// ─── estado compartilhado via arquivo ────────────────────────────────────────
 
 function salvarEstado(status: Status, qr: string | null) {
-  const state: WppState = { status, qr, updatedAt: new Date().toISOString() }
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state), 'utf8')
+  try {
+    const state: WppState = { status, qr, updatedAt: new Date().toISOString() }
+    fs.writeFileSync(STATE_FILE, JSON.stringify(state), 'utf8')
+  } catch (e) {
+    console.error('[WHATSAPP] Erro ao salvar estado:', e)
+  }
 }
 
 export function lerEstado(): WppState {
@@ -35,7 +38,7 @@ export function lerEstado(): WppState {
   return { status: 'desconectado', qr: null, updatedAt: new Date().toISOString() }
 }
 
-// ─── API usa estas funções ────────────────────────────────────────────────────
+// ─── usadas pela API ──────────────────────────────────────────────────────────
 
 export function getStatus(): Status {
   if (MOCK_MODE) return 'conectado'
@@ -46,55 +49,69 @@ export function getQrCode(): string | null {
   return lerEstado().qr
 }
 
-// API escreve flag → worker detecta e inicia sessão
 export function solicitarInicio() {
   fs.writeFileSync(INIT_FLAG, '1', 'utf8')
+  console.log('[WHATSAPP] Flag de início gravada')
 }
 
-// ─── Worker usa estas funções ─────────────────────────────────────────────────
+// ─── usadas pelo worker ───────────────────────────────────────────────────────
 
 export function verificarFlagInicio(): boolean {
   if (fs.existsSync(INIT_FLAG)) {
-    fs.unlinkSync(INIT_FLAG)
+    try { fs.unlinkSync(INIT_FLAG) } catch {}
     return true
   }
   return false
 }
 
 export async function iniciarSessao() {
-  if (MOCK_MODE || client || iniciando) return
+  if (MOCK_MODE) {
+    console.log('[WHATSAPP] Modo mock — sessão real não iniciada')
+    return
+  }
+  if (iniciando || client) {
+    console.log('[WHATSAPP] Sessão já em andamento ou conectada')
+    return
+  }
+
   iniciando = true
-
-  console.log('[WHATSAPP] Iniciando sessão WPPConnect...')
   salvarEstado('aguardando_qr', null)
+  console.log('[WHATSAPP] Iniciando sessão WPPConnect...')
 
-  // Caminho do Chrome bundled pelo puppeteer
+  // Usa o Chrome bundled do puppeteer
   let executablePath: string | undefined
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const puppeteer = require('puppeteer')
-    executablePath = puppeteer.executablePath()
+    executablePath = puppeteer.executablePath() as string
     console.log('[WHATSAPP] Chrome:', executablePath)
   } catch {
-    console.log('[WHATSAPP] Usando Chrome padrão do sistema')
+    console.log('[WHATSAPP] puppeteer não encontrado, usando Chrome do sistema')
   }
 
   try {
     client = await wppconnect.create({
       session: 'disparador',
       catchQR: (base64Qr: string) => {
+        console.log('[WHATSAPP] QR Code gerado!')
         salvarEstado('aguardando_qr', base64Qr)
-        console.log('[WHATSAPP] QR Code gerado — escaneie pelo celular')
       },
       statusFind: (status: string) => {
-        console.log('[WHATSAPP] Status:', status)
-        if (status === 'inChat' || status === 'isLogged') {
+        console.log('[WHATSAPP] Status recebido:', status)
+        if (status === 'inChat' || status === 'isLogged' || status === 'qrReadSuccess') {
           salvarEstado('conectado', null)
           console.log('[WHATSAPP] ✅ Conectado!')
         }
-        if (status === 'notLogged' || status === 'browserClose' || status === 'desconnectedMobile') {
+        if (
+          status === 'notLogged' ||
+          status === 'browserClose' ||
+          status === 'desconnectedMobile' ||
+          status === 'deleteToken'
+        ) {
           salvarEstado('desconectado', null)
           client = null
           iniciando = false
+          console.log('[WHATSAPP] Sessão encerrada:', status)
         }
       },
       headless: true,
@@ -105,11 +122,22 @@ export async function iniciarSessao() {
       autoClose: 0,
       tokenStore: 'file',
       folderNameToken: './wppconnect-sessions',
-      puppeteerOptions: executablePath ? { executablePath } : {},
+      puppeteerOptions: {
+        ...(executablePath ? { executablePath } : {}),
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
+        ],
+      },
     })
 
     salvarEstado('conectado', null)
-    console.log('[WHATSAPP] ✅ Sessão iniciada!')
+    console.log('[WHATSAPP] ✅ Sessão iniciada com sucesso!')
   } catch (err) {
     console.error('[WHATSAPP] Erro ao iniciar sessão:', err)
     salvarEstado('desconectado', null)
@@ -119,7 +147,7 @@ export async function iniciarSessao() {
   }
 }
 
-// ─── Envio de mensagem (apenas no worker) ────────────────────────────────────
+// ─── envio (apenas no worker) ─────────────────────────────────────────────────
 
 export async function enviarMensagem(telefone: string, mensagem: string): Promise<void> {
   if (MOCK_MODE) {
