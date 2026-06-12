@@ -1,5 +1,8 @@
 .claude/
 node_modules/
+wppconnect-sessions/
+backend/wpp-state.json
+backend/wpp-init.flag
 dist/
 .env
 *.log

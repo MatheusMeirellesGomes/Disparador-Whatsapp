@@ -1,11 +1,12 @@
 import { PrismaClient } from '@prisma/client'
 import dotenv from 'dotenv'
-import { enviarMensagem } from './services/whatsapp'
+import { enviarMensagem, iniciarSessao, verificarFlagInicio } from './services/whatsapp'
 
 dotenv.config()
 
 const prisma = new PrismaClient()
 const INTERVALO_MS = 5000
+const MOCK_MODE = process.env.WHATSAPP_MOCK !== 'false'
 
 async function processarFilaCampanha() {
   const pendentes = await prisma.filaEnvio.findMany({
@@ -25,10 +26,10 @@ async function processarFilaCampanha() {
         where: { id: item.id },
         data: { status: 'enviado', sentAt: new Date() },
       })
-      console.log(`[CAMPANHA] Enviado para ${item.contato.telefone}`)
+      console.log(`[CAMPANHA] ✅ Enviado para ${item.contato.telefone}`)
     } catch (err) {
       await prisma.filaEnvio.update({ where: { id: item.id }, data: { status: 'erro' } })
-      console.error(`[CAMPANHA] Erro ao enviar para ${item.contato.telefone}:`, err)
+      console.error(`[CAMPANHA] ❌ Erro ao enviar para ${item.contato.telefone}:`, err)
     }
   }
 }
@@ -59,13 +60,14 @@ async function processarFluxos() {
 
     try {
       await enviarMensagem(execucao.contato.telefone, etapa.mensagem)
-      console.log(`[FLUXO] Etapa ${etapaIndex + 1} enviada para ${execucao.contato.telefone}`)
+      console.log(`[FLUXO] ✅ Etapa ${etapaIndex + 1} enviada para ${execucao.contato.telefone}`)
 
       const proximaEtapaIndex = etapaIndex + 1
       const proximaEtapa = etapas[proximaEtapaIndex]
 
       if (!proximaEtapa) {
         await prisma.execucaoFluxo.update({ where: { id: execucao.id }, data: { status: 'concluido' } })
+        console.log(`[FLUXO] ✅ Fluxo concluído para ${execucao.contato.telefone}`)
       } else {
         const nextExecutionAt = new Date(Date.now() + proximaEtapa.delayMinutos * 60 * 1000)
         await prisma.execucaoFluxo.update({
@@ -74,13 +76,19 @@ async function processarFluxos() {
         })
       }
     } catch (err) {
-      console.error(`[FLUXO] Erro para ${execucao.contato.telefone}:`, err)
+      console.error(`[FLUXO] ❌ Erro para ${execucao.contato.telefone}:`, err)
     }
   }
 }
 
 async function tick() {
   try {
+    // Verifica se a API solicitou início de sessão WhatsApp
+    if (!MOCK_MODE && verificarFlagInicio()) {
+      console.log('[WORKER] Iniciando sessão WhatsApp...')
+      iniciarSessao()
+    }
+
     await processarFilaCampanha()
     await processarFluxos()
   } catch (err) {
@@ -90,5 +98,12 @@ async function tick() {
   }
 }
 
-console.log('[WORKER] Iniciando...')
+console.log(`[WORKER] Iniciando... Modo: ${MOCK_MODE ? 'MOCK' : 'REAL'}`)
+
+// Se modo real, já inicia a sessão automaticamente
+if (!MOCK_MODE) {
+  console.log('[WORKER] Modo real — iniciando sessão WhatsApp automaticamente...')
+  iniciarSessao()
+}
+
 tick()

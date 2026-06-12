@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Contatos from './pages/Contatos'
 import Campanhas from './pages/Campanhas'
 import Fluxos from './pages/Fluxos'
+import Whatsapp from './pages/Whatsapp'
 
 export default function App() {
   const [email, setEmail] = useState<string | null>(localStorage.getItem('email'))
@@ -30,6 +31,9 @@ export default function App() {
           <p className="sidebar-user">👤 {email}</p>
         </div>
         <p className="sidebar-subtitle">Menu</p>
+        <NavLink to="/whatsapp" className={({ isActive }) => isActive ? 'active' : ''}>
+          <span className="sidebar-icon">📱</span> WhatsApp
+        </NavLink>
         <NavLink to="/contatos" className={({ isActive }) => isActive ? 'active' : ''}>
           <span className="sidebar-icon">👥</span> Contatos
         </NavLink>
@@ -48,7 +52,8 @@ export default function App() {
       </aside>
       <main className="content">
         <Routes>
-          <Route path="/" element={<Navigate to="/contatos" />} />
+          <Route path="/" element={<Navigate to="/whatsapp" />} />
+          <Route path="/whatsapp" element={<Whatsapp />} />
           <Route path="/contatos" element={<Contatos />} />
           <Route path="/campanhas" element={<Campanhas />} />
           <Route path="/fluxos" element={<Fluxos />} />
