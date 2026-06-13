@@ -30,6 +30,10 @@ async function enviarMensagem(telefone: string, mensagem: string): Promise<void>
   }
 }
 
+function personalizarMensagem(mensagem: string, nome: string): string {
+  return mensagem.replace(/\{\{nome\}\}/gi, nome)
+}
+
 async function processarFilaCampanha() {
   const conectado = await isWhatsAppConnected()
   if (!conectado) {
@@ -46,9 +50,10 @@ async function processarFilaCampanha() {
   for (const item of pendentes) {
     try {
       await prisma.filaEnvio.update({ where: { id: item.id }, data: { status: 'processando' } })
-      await enviarMensagem(item.contato.telefone, item.mensagem)
+      const mensagemFinal = personalizarMensagem(item.mensagem, item.contato.nome)
+      await enviarMensagem(item.contato.telefone, mensagemFinal)
       await prisma.filaEnvio.update({ where: { id: item.id }, data: { status: 'enviado', sentAt: new Date() } })
-      console.log(`[CAMPANHA] ✅ Enviado → ${item.contato.telefone}`)
+      console.log(`[CAMPANHA] ✅ Enviado → ${item.contato.nome} (${item.contato.telefone})`)
       await new Promise(r => setTimeout(r, 2000))
     } catch (err) {
       await prisma.filaEnvio.update({ where: { id: item.id }, data: { status: 'erro' } })
@@ -79,8 +84,9 @@ async function processarFluxos() {
     const etapa = etapas[etapaIndex]
 
     try {
-      await enviarMensagem(execucao.contato.telefone, etapa.mensagem)
-      console.log(`[FLUXO] ✅ Etapa ${etapaIndex + 1} → ${execucao.contato.telefone}`)
+      const mensagemFinal = personalizarMensagem(etapa.mensagem, execucao.contato.nome)
+      await enviarMensagem(execucao.contato.telefone, mensagemFinal)
+      console.log(`[FLUXO] ✅ Etapa ${etapaIndex + 1} → ${execucao.contato.nome} (${execucao.contato.telefone})`)
 
       const proximaIndex = etapaIndex + 1
       const proximaEtapa = etapas[proximaIndex]

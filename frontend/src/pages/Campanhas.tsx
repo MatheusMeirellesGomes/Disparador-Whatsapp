@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { get, post, del } from '../services/api'
 
 interface Lista {
@@ -14,6 +14,10 @@ interface Campanha {
   delayMax: number
   status: string
   createdAt: string
+  total: number
+  enviados: number
+  erros: number
+  pendentes: number
 }
 
 export default function Campanhas() {
@@ -27,10 +31,19 @@ export default function Campanhas() {
     listaId: '',
   })
   const [msg, setMsg] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     carregarDados()
+    intervalRef.current = setInterval(carregarCampanhas, 5000)
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [])
+
+  async function carregarCampanhas() {
+    const c = await get<Campanha[]>('/campanhas')
+    setCampanhas(c)
+  }
 
   async function carregarDados() {
     const [c, l] = await Promise.all([
@@ -47,8 +60,19 @@ export default function Campanhas() {
     setCampanhas(prev => prev.filter(c => c.id !== id))
   }
 
+  async function retentar(id: number) {
+    try {
+      const res = await post<{ reagendados: number }>(`/campanhas/${id}/retentar`, {})
+      setMsg({ tipo: 'success', texto: `✅ ${res.reagendados} mensagem(ns) reagendada(s)` })
+      carregarCampanhas()
+    } catch {
+      setMsg({ tipo: 'error', texto: '❌ Erro ao retentar envios' })
+    }
+  }
+
   async function criarCampanha(e: React.FormEvent) {
     e.preventDefault()
+    setEnviando(true)
     try {
       await post('/campanhas', {
         ...form,
@@ -61,12 +85,14 @@ export default function Campanhas() {
       carregarDados()
     } catch (err: unknown) {
       setMsg({ tipo: 'error', texto: '❌ ' + (err instanceof Error ? err.message : 'Erro ao criar campanha') })
+    } finally {
+      setEnviando(false)
     }
   }
 
   const total = campanhas.length
   const agendadas = campanhas.filter(c => c.status === 'agendada').length
-  const pendentes = campanhas.filter(c => c.status === 'pendente').length
+  const emAndamento = campanhas.filter(c => c.status === 'processando').length
 
   return (
     <div>
@@ -87,9 +113,9 @@ export default function Campanhas() {
           <div className="stat-value">{agendadas}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-icon">⏳</div>
-          <div className="stat-label">Pendentes</div>
-          <div className="stat-value">{pendentes}</div>
+          <div className="stat-icon">🔄</div>
+          <div className="stat-label">Em andamento</div>
+          <div className="stat-value">{emAndamento}</div>
         </div>
       </div>
 
@@ -130,12 +156,18 @@ export default function Campanhas() {
             </div>
           </div>
           <div className="form-group">
-            <label>Mensagem</label>
+            <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Mensagem</span>
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>
+                Use <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>{'{{nome}}'}</code> para personalizar com o nome do contato
+                &nbsp;·&nbsp;{form.mensagem.length} chars
+              </span>
+            </label>
             <textarea
               rows={4}
               value={form.mensagem}
               onChange={e => setForm({ ...form, mensagem: e.target.value })}
-              placeholder="Olá! Temos uma oferta especial para você..."
+              placeholder={'Olá {{nome}}! Temos uma oferta especial para você...'}
               required
             />
           </div>
@@ -162,7 +194,9 @@ export default function Campanhas() {
             </div>
           </div>
           <div className="form-actions">
-            <button type="submit" className="btn btn-primary">🚀 Criar e Agendar</button>
+            <button type="submit" className="btn btn-primary" disabled={enviando}>
+              {enviando ? <span className="spinner" /> : '🚀'} {enviando ? 'Criando...' : 'Criar e Agendar'}
+            </button>
           </div>
         </form>
       </div>
@@ -170,35 +204,60 @@ export default function Campanhas() {
       <div className="card">
         <div className="card-header">
           <h2>Campanhas criadas</h2>
-          <span style={{ fontSize: 13, color: '#64748b' }}>{campanhas.length} campanha(s)</span>
+          <span style={{ fontSize: 13, color: '#64748b' }}>{campanhas.length} campanha(s) · atualiza a cada 5s</span>
         </div>
         <div className="table-wrapper">
           <table>
             <thead>
               <tr>
                 <th>Nome</th>
-                <th>Mensagem</th>
+                <th>Progresso</th>
                 <th>Delay</th>
                 <th>Status</th>
                 <th>Criada em</th>
-                <th>Ação</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {campanhas.map(c => (
-                <tr key={c.id}>
-                  <td><strong>{c.nome}</strong></td>
-                  <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#64748b' }}>
-                    {c.mensagem}
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>{c.delayMin}s – {c.delayMax}s</td>
-                  <td><span className={`badge badge-${c.status}`}>{c.status}</span></td>
-                  <td style={{ color: '#64748b', fontSize: 13 }}>{new Date(c.createdAt).toLocaleString('pt-BR')}</td>
-                  <td>
-                    <button className="btn btn-danger btn-sm" onClick={() => removerCampanha(c.id)}>🗑</button>
-                  </td>
-                </tr>
-              ))}
+              {campanhas.map(c => {
+                const pct = c.total > 0 ? Math.round((c.enviados / c.total) * 100) : 0
+                return (
+                  <tr key={c.id}>
+                    <td>
+                      <strong>{c.nome}</strong>
+                      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.mensagem}
+                      </div>
+                    </td>
+                    <td style={{ minWidth: 180 }}>
+                      {c.total > 0 ? (
+                        <div>
+                          <div className="progress-bar">
+                            <div className="progress-fill" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                            {c.enviados}/{c.total} enviados
+                            {c.erros > 0 && <span style={{ color: '#ef4444', marginLeft: 8 }}>{c.erros} erro(s)</span>}
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: 13 }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{c.delayMin}s – {c.delayMax}s</td>
+                    <td><span className={`badge badge-${c.status}`}>{c.status}</span></td>
+                    <td style={{ color: '#64748b', fontSize: 13 }}>{new Date(c.createdAt).toLocaleString('pt-BR')}</td>
+                    <td style={{ display: 'flex', gap: 6 }}>
+                      {c.erros > 0 && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => retentar(c.id)} title="Retentar erros">
+                          🔁
+                        </button>
+                      )}
+                      <button className="btn btn-danger btn-sm" onClick={() => removerCampanha(c.id)}>🗑</button>
+                    </td>
+                  </tr>
+                )
+              })}
               {campanhas.length === 0 && (
                 <tr className="empty-row"><td colSpan={6}>Nenhuma campanha criada ainda</td></tr>
               )}

@@ -13,6 +13,11 @@ interface Contato {
   telefone: string
 }
 
+interface ContatoWA {
+  nome: string
+  telefone: string
+}
+
 export default function Contatos() {
   const [listas, setListas] = useState<Lista[]>([])
   const [nomeLista, setNomeLista] = useState('')
@@ -23,6 +28,14 @@ export default function Contatos() {
   const [telefoneContato, setTelefoneContato] = useState('')
   const [listaManual, setListaManual] = useState<number | null>(null)
   const [msg, setMsg] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null)
+
+  // WhatsApp contacts import
+  const [contatosWA, setContatosWA] = useState<ContatoWA[]>([])
+  const [carregandoWA, setCarregandoWA] = useState(false)
+  const [selecionadosWA, setSelecionadosWA] = useState<Set<string>>(new Set())
+  const [listaImportWA, setListaImportWA] = useState<number | null>(null)
+  const [buscaWA, setBuscaWA] = useState('')
+  const [importandoWA, setImportandoWA] = useState(false)
 
   useEffect(() => {
     carregarListas()
@@ -79,6 +92,62 @@ export default function Contatos() {
     }
   }
 
+  async function buscarContatosWhatsApp() {
+    setCarregandoWA(true)
+    setSelecionadosWA(new Set())
+    try {
+      const data = await get<ContatoWA[]>('/whatsapp/contatos')
+      setContatosWA(data)
+      if (data.length === 0) {
+        setMsg({ tipo: 'error', texto: '⚠️ Nenhum contato encontrado. Certifique-se que o WhatsApp está conectado.' })
+      }
+    } catch {
+      setMsg({ tipo: 'error', texto: '❌ Erro ao buscar contatos do WhatsApp' })
+    } finally {
+      setCarregandoWA(false)
+    }
+  }
+
+  async function importarSelecionadosWA() {
+    if (!listaImportWA || selecionadosWA.size === 0) return
+    setImportandoWA(true)
+    try {
+      const selecionados = contatosWA.filter(c => selecionadosWA.has(c.telefone))
+      let importados = 0
+      for (const c of selecionados) {
+        try {
+          await post(`/contatos/listas/${listaImportWA}/contatos`, { nome: c.nome, telefone: c.telefone })
+          importados++
+        } catch { /* skip duplicates */ }
+      }
+      setMsg({ tipo: 'success', texto: `✅ ${importados} contato(s) importado(s) do WhatsApp!` })
+      setSelecionadosWA(new Set())
+      carregarListas()
+    } catch {
+      setMsg({ tipo: 'error', texto: '❌ Erro ao importar contatos' })
+    } finally {
+      setImportandoWA(false)
+    }
+  }
+
+  function toggleWA(telefone: string) {
+    setSelecionadosWA(prev => {
+      const next = new Set(prev)
+      if (next.has(telefone)) next.delete(telefone)
+      else next.add(telefone)
+      return next
+    })
+  }
+
+  function selecionarTodosWA() {
+    const filtrados = contatosWAfiltrados
+    if (selecionadosWA.size === filtrados.length) {
+      setSelecionadosWA(new Set())
+    } else {
+      setSelecionadosWA(new Set(filtrados.map(c => c.telefone)))
+    }
+  }
+
   async function removerContato(id: number) {
     if (!confirm('Remover este contato?')) return
     await del(`/contatos/contatos/${id}`)
@@ -102,13 +171,18 @@ export default function Contatos() {
     setContatos(data)
   }
 
+  const contatosWAfiltrados = contatosWA.filter(c =>
+    c.nome.toLowerCase().includes(buscaWA.toLowerCase()) ||
+    c.telefone.includes(buscaWA)
+  )
+
   const totalContatos = listas.reduce((acc, l) => acc + l._count.contatos, 0)
 
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">Contatos</h1>
-        <p className="page-subtitle">Gerencie suas listas e importe contatos via CSV</p>
+        <p className="page-subtitle">Gerencie suas listas e importe contatos via CSV ou WhatsApp</p>
       </div>
 
       <div className="stats-row">
@@ -228,6 +302,96 @@ export default function Contatos() {
           <div />
           <button type="submit" className="btn btn-primary">📤 Importar</button>
         </form>
+      </div>
+
+      {/* Importar do WhatsApp */}
+      <div className="card">
+        <div className="card-header">
+          <h2>📱 Importar do WhatsApp</h2>
+        </div>
+        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+          Busque os contatos salvos na conta do WhatsApp conectado e importe direto para uma lista.
+        </p>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-primary"
+            onClick={buscarContatosWhatsApp}
+            disabled={carregandoWA}
+          >
+            {carregandoWA ? <><span className="spinner" /> Buscando...</> : '🔍 Buscar contatos do WhatsApp'}
+          </button>
+          {contatosWA.length > 0 && (
+            <span style={{ fontSize: 13, color: '#64748b' }}>{contatosWA.length} contato(s) encontrado(s)</span>
+          )}
+        </div>
+
+        {contatosWA.length > 0 && (
+          <div>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Buscar por nome ou telefone..."
+                value={buscaWA}
+                onChange={e => setBuscaWA(e.target.value)}
+                style={{ flex: 1, minWidth: 200 }}
+              />
+              <select
+                value={listaImportWA ?? ''}
+                onChange={e => setListaImportWA(Number(e.target.value))}
+                style={{ minWidth: 180 }}
+              >
+                <option value="">-- selecione lista de destino --</option>
+                {listas.map(l => (
+                  <option key={l.id} value={l.id}>{l.nome}</option>
+                ))}
+              </select>
+              <button className="btn btn-secondary btn-sm" onClick={selecionarTodosWA}>
+                {selecionadosWA.size === contatosWAfiltrados.length && contatosWAfiltrados.length > 0 ? 'Desmarcar todos' : 'Selecionar todos'}
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={importarSelecionadosWA}
+                disabled={selecionadosWA.size === 0 || !listaImportWA || importandoWA}
+              >
+                {importandoWA ? <span className="spinner" /> : '📥'} Importar {selecionadosWA.size > 0 ? `(${selecionadosWA.size})` : ''}
+              </button>
+            </div>
+            <div className="table-wrapper" style={{ maxHeight: 320, overflowY: 'auto' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: 40 }}></th>
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contatosWAfiltrados.map(c => (
+                    <tr
+                      key={c.telefone}
+                      onClick={() => toggleWA(c.telefone)}
+                      style={{ cursor: 'pointer', background: selecionadosWA.has(c.telefone) ? 'var(--primary-light, #eff6ff)' : undefined }}
+                    >
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selecionadosWA.has(c.telefone)}
+                          onChange={() => toggleWA(c.telefone)}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      </td>
+                      <td><strong>{c.nome}</strong></td>
+                      <td style={{ color: '#64748b' }}>{c.telefone}</td>
+                    </tr>
+                  ))}
+                  {contatosWAfiltrados.length === 0 && (
+                    <tr className="empty-row"><td colSpan={3}>Nenhum contato encontrado</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card">

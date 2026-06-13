@@ -59,11 +59,25 @@ router.post('/', async (req: Request, res: Response) => {
   }
 })
 
-// Listar campanhas
+// Listar campanhas com progresso
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const campanhas = await prisma.campanha.findMany({ orderBy: { createdAt: 'desc' } })
-    res.json(campanhas)
+    const campanhasComProgresso = await Promise.all(
+      campanhas.map(async (c) => {
+        const fila = await prisma.filaEnvio.groupBy({
+          by: ['status'],
+          where: { campanhaId: c.id },
+          _count: true,
+        })
+        const total = fila.reduce((acc, f) => acc + f._count, 0)
+        const enviados = fila.find((f) => f.status === 'enviado')?._count ?? 0
+        const erros = fila.find((f) => f.status === 'erro')?._count ?? 0
+        const pendentes = fila.find((f) => f.status === 'pendente')?._count ?? 0
+        return { ...c, total, enviados, erros, pendentes }
+      })
+    )
+    res.json(campanhasComProgresso)
   } catch (err) {
     res.status(500).json({ erro: String(err) })
   }
@@ -80,6 +94,20 @@ router.get('/:id', async (req: Request, res: Response) => {
       _count: true,
     })
     res.json({ campanha, fila })
+  } catch (err) {
+    res.status(500).json({ erro: String(err) })
+  }
+})
+
+// Retentar mensagens com erro
+router.post('/:id/retentar', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id)
+    const result = await prisma.filaEnvio.updateMany({
+      where: { campanhaId: id, status: 'erro' },
+      data: { status: 'pendente', scheduledAt: new Date() },
+    })
+    res.json({ reagendados: result.count })
   } catch (err) {
     res.status(500).json({ erro: String(err) })
   }

@@ -59,6 +59,20 @@ router.post('/enviar', async (req: Request, res: Response) => {
   }
 })
 
+router.get('/contatos', async (_req: Request, res: Response) => {
+  if (isMock()) {
+    res.json([])
+    return
+  }
+  try {
+    const client = getWhatsAppClient()
+    const contatos = await client.getAllContacts()
+    res.json(contatos)
+  } catch (err) {
+    res.status(500).json({ erro: String(err) })
+  }
+})
+
 router.post('/iniciar', (_req: Request, res: Response) => {
   if (isMock()) {
     res.json({ mensagem: 'Modo mock ativo' })

@@ -4,4 +4,5 @@ export interface IWhatsAppClient {
   isConnected(): Promise<boolean>
   getQRCode(): Promise<string | null>
   disconnect(): Promise<void>
+  getAllContacts(): Promise<Array<{ nome: string; telefone: string }>>
 }

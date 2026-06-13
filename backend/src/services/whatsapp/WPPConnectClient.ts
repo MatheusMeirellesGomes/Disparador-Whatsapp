@@ -78,4 +78,25 @@ export class WPPConnectClient implements IWhatsAppClient {
       console.log('[WhatsApp] Desconectado')
     }
   }
+
+  async getAllContacts(): Promise<Array<{ nome: string; telefone: string }>> {
+    if (!this.client) return []
+    try {
+      const contacts = await this.client.getAllContacts()
+      return (contacts as any[])
+        .filter((c) =>
+          c.id?._serialized?.includes('@c.us') &&
+          !c.isMe &&
+          !c.isGroup &&
+          c.isMyContact === true
+        )
+        .map((c) => ({
+          nome: c.name || c.pushname || c.verifiedName || 'Sem nome',
+          telefone: c.id._serialized.replace('@c.us', ''),
+        }))
+        .filter((c) => c.telefone.length >= 10)
+    } catch {
+      return []
+    }
+  }
 }

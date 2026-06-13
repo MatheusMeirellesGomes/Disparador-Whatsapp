@@ -24,4 +24,8 @@ export class MockWhatsAppClient implements IWhatsAppClient {
     this.connected = false
     console.log('[WhatsApp Mock] Desconectado')
   }
+
+  async getAllContacts(): Promise<Array<{ nome: string; telefone: string }>> {
+    return []
+  }
 }
